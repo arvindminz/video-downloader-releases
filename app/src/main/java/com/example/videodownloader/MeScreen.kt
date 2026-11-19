@@ -68,8 +68,8 @@ fun MeScreen(
 
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var hasUpdate by remember { mutableStateOf(false) }
-    var updateVersion by remember { mutableStateOf("v1.1.0") }
-    var updateDownloadUrl by remember { mutableStateOf("https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/app-release.apk") }
+    var updateVersion by remember { mutableStateOf("v1.1.1") }
+    var updateDownloadUrl by remember { mutableStateOf("https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/VideoDownloader.v1.1.1.apk") }
     var updateReleaseNotes by remember { mutableStateOf("New version available!") }
 
     var isDownloadingUpdate by remember { mutableStateOf(false) }
@@ -350,7 +350,7 @@ fun MeScreen(
                     MeMenuItem(
                         iconRes = R.drawable.share,
                         label = "Share",
-                        onClick = { shareAppLink(context) }
+                        onClick = { shareAppLink(context, updateDownloadUrl, updateVersion) }
                     )
                     MeMenuItem(
                         iconText = "👍",

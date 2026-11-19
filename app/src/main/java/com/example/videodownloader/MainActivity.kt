@@ -776,15 +776,18 @@ fun openDownloadFolder(context: Context) {
     Toast.makeText(context, "Location: Download/VideoDownloader", Toast.LENGTH_LONG).show()
 }
 
-fun shareAppLink(context: Context) {
-    val driveUrl = "https://drive.google.com/drive/folders/19GIJWEZPmPr-IO5W2CxugXzX8rkAjLyq?usp=sharing"
+fun shareAppLink(
+    context: Context,
+    downloadUrl: String = "https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/VideoDownloader.v1.1.1.apk",
+    version: String = "v1.1.1"
+) {
     val shareMessage = """
-        🎥 Video Downloader — Fast & Private Media Downloader!
+        🎥 Video Downloader ($version) — Fast & Private Media Downloader!
 
-        Download videos & audio in 4K, 1080p, 720p, MP3/M4A from YouTube, Instagram, TikTok, Facebook, Twitter, and 1000+ sites with multi-threaded parallel speed!
+        Download videos & audio in 4K, 1080p, 720p, MP3/M4A from YouTube, Instagram, TikTok, Facebook, Twitter, and 1000+ sites with multi-threaded speed!
 
-        📥 Download the app from Google Drive:
-        $driveUrl
+        📥 Download latest APK:
+        $downloadUrl
     """.trimIndent()
 
     try {
