@@ -233,7 +233,7 @@ fun ItemThumbnailPreview(
     }
 
     val durationText = remember(item) {
-        if (item.durationSeconds > 0) formatDuration(item.durationSeconds) else "00:30"
+        if (item.durationSeconds > 0) formatDuration(item.durationSeconds) else ""
     }
 
     val isYouTube = remember(item) { item.url.contains("youtu", ignoreCase = true) }
@@ -264,8 +264,8 @@ fun ItemThumbnailPreview(
             }
         }
 
-        // Top-Right: CC Subtitle Badge (if YouTube video)
-        if (isYouTube && !item.isAudioOnly) {
+        // Top-Right: CC Subtitle Badge (ONLY if captions/subtitles actually downloaded)
+        if (!isApk && item.hasSubtitles) {
             Surface(
                 shape = RoundedCornerShape(topEnd = 8.dp, bottomStart = 5.dp),
                 color = Color(0xFFAB47BC), // Purple CC badge

@@ -112,6 +112,7 @@ class SharePopupActivity : ComponentActivity() {
                     videoInfo = currentInfo,
                     isLoading = false,
                     onFormatSelected = { format -> startDownload(sharedUrl, format, isYouTube) },
+                    onPlaylistDownloadSelected = { items, format, withSubs -> startPlaylistDownloads(items, format, withSubs) },
                     onDismiss = { finish() }
                 )
             }
@@ -132,8 +133,8 @@ class SharePopupActivity : ComponentActivity() {
         finish()
     }
 
-    private fun startPlaylistDownloads(selectedItems: List<PlaylistItem>, format: MediaFormat) {
-        DownloadRepository.startBatchDownloads(applicationContext, selectedItems, format)
+    private fun startPlaylistDownloads(selectedItems: List<PlaylistItem>, format: MediaFormat, downloadSubtitles: Boolean = false) {
+        DownloadRepository.startBatchDownloads(applicationContext, selectedItems, format, downloadSubtitles)
         Toast.makeText(this, "Added ${selectedItems.size} items to download queue", Toast.LENGTH_SHORT).show()
         finish()
     }
@@ -181,7 +182,7 @@ fun SharePopupContent(
     videoInfo: VideoInfo,
     isLoading: Boolean,
     onFormatSelected: (MediaFormat) -> Unit,
-    onPlaylistDownloadSelected: (List<PlaylistItem>, MediaFormat) -> Unit = { _, _ -> },
+    onPlaylistDownloadSelected: (List<PlaylistItem>, MediaFormat, Boolean) -> Unit = { _, _, _ -> },
     onDismiss: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -292,7 +293,7 @@ fun PlaylistDetailsContent(
     videoInfo: VideoInfo,
     isLoadingRealtime: Boolean = false,
     listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
-    onDownloadSelected: (List<PlaylistItem>, MediaFormat) -> Unit,
+    onDownloadSelected: (List<PlaylistItem>, MediaFormat, Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Video, 1 = Audio
@@ -305,6 +306,8 @@ fun PlaylistDetailsContent(
     var itemsState by remember(videoInfo.playlistItems.size) {
         mutableStateOf(videoInfo.playlistItems)
     }
+
+    var downloadSubtitles by remember { mutableStateOf(false) }
 
     val selectedCount = itemsState.count { it.isSelected }
     val allSelected = itemsState.isNotEmpty() && itemsState.all { it.isSelected }
@@ -437,7 +440,7 @@ fun PlaylistDetailsContent(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ── Select All / Deselect All Controls ──
+        // ── Select All / Deselect All Controls & Subtitle Option ──
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -465,12 +468,23 @@ fun PlaylistDetailsContent(
                 )
             }
 
-            Text(
-                text = "Applied: ${selectedFormat.resolution.ifEmpty { selectedFormat.formatNote }}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { downloadSubtitles = !downloadSubtitles }
+            ) {
+                Checkbox(
+                    checked = downloadSubtitles,
+                    onCheckedChange = { downloadSubtitles = it },
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Download CC",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(2.dp))
@@ -507,7 +521,7 @@ fun PlaylistDetailsContent(
             onClick = {
                 val selectedItems = itemsState.filter { it.isSelected }
                 if (selectedItems.isNotEmpty()) {
-                    onDownloadSelected(selectedItems, selectedFormat)
+                    onDownloadSelected(selectedItems, selectedFormat, downloadSubtitles)
                 }
             },
             enabled = selectedCount > 0,
@@ -665,9 +679,11 @@ fun Modifier.draggableVerticalScrollbar(
 fun VideoDetailsContent(
     videoInfo: VideoInfo,
     onFormatSelected: (MediaFormat) -> Unit,
+    onFormatSelectedWithSubs: ((MediaFormat, Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var downloadSubtitles by remember { mutableStateOf(false) }
 
     Column(modifier = modifier) {
         Row(
@@ -691,14 +707,34 @@ fun VideoDetailsContent(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = formatDuration(videoInfo.durationSeconds),
+                    text = if (videoInfo.durationSeconds > 0) formatDuration(videoInfo.durationSeconds) else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 4.dp).clickable { downloadSubtitles = !downloadSubtitles }
+        ) {
+            Checkbox(
+                checked = downloadSubtitles,
+                onCheckedChange = { downloadSubtitles = it },
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Download Captions / Subtitles (CC)",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         TabRow(selectedTabIndex = selectedTab) {
             Tab(
@@ -729,7 +765,16 @@ fun VideoDetailsContent(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 items(formats) { format ->
-                    FormatRow(format = format, onSelect = onFormatSelected)
+                    FormatRow(
+                        format = format,
+                        onSelect = { selected ->
+                            if (onFormatSelectedWithSubs != null) {
+                                onFormatSelectedWithSubs(selected, downloadSubtitles)
+                            } else {
+                                onFormatSelected(selected)
+                            }
+                        }
+                    )
                 }
             }
         }

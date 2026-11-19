@@ -23,6 +23,16 @@ object TelemetryHelper {
 
     private const val SERVER_URL = "https://video-downloader-telemetry.arvindminz158.workers.dev/api/install"
 
+    fun getOrCreateInstallId(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        var installId = prefs.getString(KEY_INSTALL_ID, null)
+        if (installId.isNullOrBlank()) {
+            installId = UUID.randomUUID().toString()
+            prefs.edit().putString(KEY_INSTALL_ID, installId).apply()
+        }
+        return installId
+    }
+
     fun checkAndReportInstall(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val hasReported = prefs.getBoolean(KEY_REPORTED, false)

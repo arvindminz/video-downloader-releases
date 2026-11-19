@@ -150,6 +150,12 @@ class DownloadWorker(
                         addOption("--geo-bypass")
                         addOption("--merge-output-format", "mp4")
 
+                        val currentItem = DownloadRepository.downloadItems.value.find { it.id == downloadId }
+                        if (currentItem?.downloadSubtitles == true) {
+                            addOption("--write-subs")
+                            addOption("--sub-langs", "en,hi,all")
+                        }
+
                         if (isYouTube) {
                             addOption("--extractor-args", "youtube:player_client=visionos,web")
                         }
@@ -259,6 +265,25 @@ class DownloadWorker(
                 val actualSizeBytes = downloadedFile.length()
                 Log.d(TAG, "Downloaded: ${downloadedFile.name} ($actualSizeBytes bytes)")
 
+                // Extract actual media file duration using MediaMetadataRetriever
+                var actualDurationSec = durationSeconds
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(downloadedFile.absolutePath)
+                    val durStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    val durMillis = durStr?.toLongOrNull() ?: 0L
+                    if (durMillis > 0L) {
+                        actualDurationSec = durMillis / 1000L
+                    }
+                    retriever.release()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to read file duration with MediaMetadataRetriever", e)
+                }
+
+                val hasSubFile = outputDir.listFiles()?.any {
+                    it.name.endsWith(".srt") || it.name.endsWith(".vtt") || it.name.endsWith(".ass")
+                } ?: false
+
                 val (savedUri, savedPath) = saveToMediaStore(downloadedFile, finalTitle, actualExtension)
                 downloadedFile.delete()
                 outputDir.deleteRecursively()
@@ -269,7 +294,9 @@ class DownloadWorker(
                     actualSizeBytes = actualSizeBytes,
                     savedUri = savedUri,
                     savedPath = savedPath,
-                    actualTitle = finalTitle
+                    actualTitle = finalTitle,
+                    actualDurationSeconds = actualDurationSec,
+                    hasSubtitles = hasSubFile
                 )
                 Result.success()
             }

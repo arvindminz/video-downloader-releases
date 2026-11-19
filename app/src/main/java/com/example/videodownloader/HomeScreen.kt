@@ -43,7 +43,7 @@ fun HomeScreenContent(
     errorMessage: String?,
     onFetchFormats: (String) -> Unit,
     onFormatSelected: (MediaFormat) -> Unit,
-    onPlaylistDownloadSelected: (List<PlaylistItem>, MediaFormat) -> Unit,
+    onPlaylistDownloadSelected: (List<PlaylistItem>, MediaFormat, Boolean) -> Unit,
     onReset: () -> Unit,
     onOpenBrowser: (String) -> Unit,
     onPlayVideo: (TrendingVideo) -> Unit = {},

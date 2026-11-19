@@ -47,7 +47,9 @@ data class DownloadItem(
     val savedPath: String? = null,
     val thumbnailUrl: String = "",
     val resolutionLabel: String = "",
-    val chunkProgresses: List<Float> = emptyList()
+    val chunkProgresses: List<Float> = emptyList(),
+    val downloadSubtitles: Boolean = false,
+    val hasSubtitles: Boolean = false
 )
 
 object DownloadRepository {
@@ -252,7 +254,8 @@ object DownloadRepository {
         title: String,
         format: MediaFormat,
         durationSeconds: Long = 0L,
-        thumbnailUrl: String = ""
+        thumbnailUrl: String = "",
+        downloadSubtitles: Boolean = false
     ): String {
         init(context)
         val downloadId = UUID.randomUUID().toString()
@@ -269,7 +272,8 @@ object DownloadRepository {
             status = DownloadStatus.PENDING,
             downloadSpeed = "Pending",
             thumbnailUrl = thumbnailUrl.ifBlank { deriveYouTubeThumbnail(url) },
-            resolutionLabel = deriveResolutionLabel(format)
+            resolutionLabel = deriveResolutionLabel(format),
+            downloadSubtitles = downloadSubtitles
         )
 
         _downloadItems.value = listOf(item) + _downloadItems.value
@@ -283,7 +287,8 @@ object DownloadRepository {
     fun startBatchDownloads(
         context: Context,
         items: List<PlaylistItem>,
-        format: MediaFormat
+        format: MediaFormat,
+        downloadSubtitles: Boolean = false
     ) {
         init(context)
         if (items.isEmpty()) return
@@ -306,7 +311,8 @@ object DownloadRepository {
                 status = DownloadStatus.PENDING,
                 downloadSpeed = "Pending",
                 thumbnailUrl = item.thumbnailUrl.ifBlank { deriveYouTubeThumbnail(item.url) },
-                resolutionLabel = deriveResolutionLabel(format)
+                resolutionLabel = deriveResolutionLabel(format),
+                downloadSubtitles = downloadSubtitles
             )
             newDownloadItems.add(downloadItem)
         }
@@ -398,11 +404,14 @@ object DownloadRepository {
         actualSizeBytes: Long = 0L,
         savedUri: String? = null,
         savedPath: String? = null,
-        actualTitle: String? = null
+        actualTitle: String? = null,
+        actualDurationSeconds: Long = 0L,
+        hasSubtitles: Boolean = false
     ) {
         _downloadItems.value = _downloadItems.value.map { item ->
             if (item.id == id) {
                 val finalSize = if (actualSizeBytes > 0) actualSizeBytes else item.fileSizeBytes
+                val finalDuration = if (actualDurationSeconds > 0L) actualDurationSeconds else item.durationSeconds
                 item.copy(
                     title = if (!actualTitle.isNullOrBlank()) actualTitle else item.title,
                     progress = 100,
@@ -410,6 +419,8 @@ object DownloadRepository {
                     status = DownloadStatus.COMPLETED,
                     fileSizeBytes = finalSize,
                     downloadedBytes = finalSize,
+                    durationSeconds = finalDuration,
+                    hasSubtitles = hasSubtitles || item.downloadSubtitles,
                     savedUri = savedUri ?: item.savedUri,
                     savedPath = savedPath ?: item.savedPath
                 )

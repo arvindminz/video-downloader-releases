@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.OptIn
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -325,9 +327,8 @@ fun VideoPlayerScreen(
                         }
                     )
                     PlayerActionButton(
-                        iconText = "💬",
+                        iconRes = R.drawable.share,
                         label = "Share",
-                        iconColor = Color(0xFF25D366),
                         onClick = {
                             val intent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
@@ -477,7 +478,8 @@ fun VideoPlayerScreen(
 
 @Composable
 fun PlayerActionButton(
-    iconText: String,
+    iconText: String? = null,
+    iconRes: Int? = null,
     label: String,
     iconColor: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit
@@ -493,7 +495,15 @@ fun PlayerActionButton(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(iconText, fontSize = 18.sp, color = iconColor)
+            if (iconRes != null) {
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = label,
+                    modifier = Modifier.size(20.dp)
+                )
+            } else if (iconText != null) {
+                Text(iconText, fontSize = 18.sp, color = iconColor)
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(

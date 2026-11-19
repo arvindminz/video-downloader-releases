@@ -20,6 +20,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.core.content.FileProvider
 import java.io.File
 import androidx.compose.ui.text.font.FontWeight
@@ -90,7 +92,10 @@ class MainActivity : ComponentActivity() {
         handleIncomingIntent(intent)
 
         setContent {
-            VideoDownloaderTheme {
+            val context = LocalContext.current
+            var currentThemeMode by remember { mutableStateOf(SettingsRepository.getThemeMode(context)) }
+
+            VideoDownloaderTheme(themeMode = currentThemeMode) {
                 MainAppScreen(
                     initialTab = initialTabState,
                     currentUrl = currentUrl,
@@ -100,8 +105,13 @@ class MainActivity : ComponentActivity() {
                     errorMessage = errorMessage,
                     onFetchFormats = { url -> fetchFormats(url) },
                     onFormatSelected = { format -> startDownload(currentUrl, videoInfo?.title ?: "video", format) },
-                    onPlaylistDownloadSelected = { items, format -> startPlaylistDownloads(items, format) },
-                    onReset = { resetState() }
+                    onPlaylistDownloadSelected = { items, format, withSubs -> startPlaylistDownloads(items, format, withSubs) },
+                    onReset = { resetState() },
+                    themeMode = currentThemeMode,
+                    onThemeModeChange = { newMode ->
+                        currentThemeMode = newMode
+                        SettingsRepository.setThemeMode(context, newMode)
+                    }
                 )
             }
         }
@@ -241,14 +251,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startDownload(url: String, title: String, format: MediaFormat) {
+    private fun startDownload(url: String, title: String, format: MediaFormat, downloadSubtitles: Boolean = false) {
         val duration = videoInfo?.durationSeconds ?: 0L
-        DownloadRepository.startDownload(applicationContext, url, title, format, durationSeconds = duration)
+        val thumbnail = videoInfo?.thumbnailUrl ?: ""
+        DownloadRepository.startDownload(
+            context = applicationContext,
+            url = url,
+            title = title,
+            format = format,
+            durationSeconds = duration,
+            thumbnailUrl = thumbnail,
+            downloadSubtitles = downloadSubtitles
+        )
         Toast.makeText(this, "Added to download queue", Toast.LENGTH_SHORT).show()
     }
 
-    private fun startPlaylistDownloads(selectedItems: List<PlaylistItem>, format: MediaFormat) {
-        DownloadRepository.startBatchDownloads(applicationContext, selectedItems, format)
+    private fun startPlaylistDownloads(selectedItems: List<PlaylistItem>, format: MediaFormat, downloadSubtitles: Boolean = false) {
+        DownloadRepository.startBatchDownloads(applicationContext, selectedItems, format, downloadSubtitles)
         Toast.makeText(this, "Added ${selectedItems.size} items to download queue", Toast.LENGTH_SHORT).show()
     }
 
@@ -273,8 +292,10 @@ fun MainAppScreen(
     errorMessage: String?,
     onFetchFormats: (String) -> Unit,
     onFormatSelected: (MediaFormat) -> Unit,
-    onPlaylistDownloadSelected: (List<PlaylistItem>, MediaFormat) -> Unit,
-    onReset: () -> Unit
+    onPlaylistDownloadSelected: (List<PlaylistItem>, MediaFormat, Boolean) -> Unit,
+    onReset: () -> Unit,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    onThemeModeChange: (ThemeMode) -> Unit = {}
 ) {
     var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
     var myFilesSubTab by remember { mutableIntStateOf(0) }
@@ -349,19 +370,22 @@ fun MainAppScreen(
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = {
-                        myFilesSubTab = 0
+                        myFilesSubTab = if (activeCount > 0) 0 else 1
                         selectedTab = 1
                     },
                     icon = {
                         BadgedBox(
                             badge = {
-                                val totalCount = activeCount + completedCount
-                                if (totalCount > 0) {
-                                    Badge { Text("$totalCount") }
+                                if (activeCount > 0) {
+                                    Badge { Text("$activeCount") }
                                 }
                             }
                         ) {
-                            Text("📂", fontSize = 18.sp)
+                            Image(
+                                painter = painterResource(id = R.drawable.folder),
+                                contentDescription = "MY FILES",
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     },
                     label = { Text("MY FILES", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal, color = if (selectedTab == 1) androidx.compose.ui.graphics.Color.Red else androidx.compose.ui.graphics.Color.Unspecified) }
@@ -369,7 +393,13 @@ fun MainAppScreen(
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    icon = { Text("👤", fontSize = 18.sp) },
+                    icon = {
+                        Image(
+                            painter = painterResource(id = R.drawable.user),
+                            contentDescription = "ME",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     label = { Text("ME", fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal, color = if (selectedTab == 2) androidx.compose.ui.graphics.Color.Red else androidx.compose.ui.graphics.Color.Unspecified) }
                 )
             }
@@ -390,8 +420,8 @@ fun MainAppScreen(
                         myFilesSubTab = 0
                         selectedTab = 1 // Switch to MY FILES tab upon downloading
                     },
-                    onPlaylistDownloadSelected = { selectedItems, format ->
-                        onPlaylistDownloadSelected(selectedItems, format)
+                    onPlaylistDownloadSelected = { selectedItems, format, withSubs ->
+                        onPlaylistDownloadSelected(selectedItems, format, withSubs)
                         myFilesSubTab = 0
                         selectedTab = 1 // Switch to MY FILES tab upon downloading
                     },
@@ -400,7 +430,7 @@ fun MainAppScreen(
                         myFilesSubTab = 1 // 1 = Downloads sub-tab!
                         selectedTab = 1
                     },
-                    activeBadgeCount = activeCount + completedCount
+                    activeBadgeCount = activeCount
                 )
                 1 -> MyFilesScreen(
                     initialSubTab = myFilesSubTab,
@@ -422,7 +452,9 @@ fun MainAppScreen(
                         selectedTab = 0
                     },
                     onOpenBrowser = { url -> activeBrowserUrl = url },
-                    activeBadgeCount = activeCount + completedCount
+                    activeBadgeCount = activeCount,
+                    themeMode = themeMode,
+                    onThemeModeChange = onThemeModeChange
                 )
             }
         }
@@ -445,7 +477,7 @@ fun MainScreenContent(
     errorMessage: String?,
     onFetchFormats: (String) -> Unit,
     onFormatSelected: (MediaFormat) -> Unit,
-    onPlaylistDownloadSelected: (List<PlaylistItem>, MediaFormat) -> Unit,
+    onPlaylistDownloadSelected: (List<PlaylistItem>, MediaFormat, Boolean) -> Unit,
     onReset: () -> Unit,
     onNavigateToFiles: () -> Unit = {},
     activeBadgeCount: Int = 0
