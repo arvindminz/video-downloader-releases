@@ -68,9 +68,9 @@ fun MeScreen(
 
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var hasUpdate by remember { mutableStateOf(false) }
-    var updateVersion by remember { mutableStateOf("v1.1.1") }
-    var updateDownloadUrl by remember { mutableStateOf("https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/VideoDownloader.v1.1.1.apk") }
-    var updateReleaseNotes by remember { mutableStateOf("New version available!") }
+    var updateVersion by remember { mutableStateOf(installedVersionName) }
+    var updateDownloadUrl by remember { mutableStateOf("https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/VideoDownloader.v1.1.2.apk") }
+    var updateReleaseNotes by remember { mutableStateOf("Regular maintenance update.") }
 
     var isDownloadingUpdate by remember { mutableStateOf(false) }
     var updateProgressPercent by remember { mutableIntStateOf(0) }
@@ -114,11 +114,9 @@ fun MeScreen(
                     val updateAvailable = json.optBoolean("has_update", false)
                     withContext(Dispatchers.Main) {
                         hasUpdate = updateAvailable
-                        if (updateAvailable) {
-                            updateVersion = json.optString("latest_version", "v1.1.0")
-                            updateDownloadUrl = json.optString("download_url", "https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/app-release.apk")
-                            updateReleaseNotes = json.optString("release_notes", "New version available!")
-                        }
+                        updateVersion = json.optString("latest_version", installedVersionName)
+                        updateDownloadUrl = json.optString("download_url", "https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/VideoDownloader.v1.1.2.apk")
+                        updateReleaseNotes = json.optString("release_notes", "Regular maintenance update.")
                         isCheckingUpdate = false
                     }
                 } else {

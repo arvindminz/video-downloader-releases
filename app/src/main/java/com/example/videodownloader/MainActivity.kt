@@ -778,8 +778,8 @@ fun openDownloadFolder(context: Context) {
 
 fun shareAppLink(
     context: Context,
-    downloadUrl: String = "https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/VideoDownloader.v1.1.1.apk",
-    version: String = "v1.1.1"
+    downloadUrl: String = "https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/VideoDownloader.v1.1.2.apk",
+    version: String = "1.1.2"
 ) {
     val shareMessage = """
         🎥 Video Downloader ($version) — Fast & Private Media Downloader!
