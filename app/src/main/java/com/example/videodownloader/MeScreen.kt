@@ -98,6 +98,11 @@ fun MeScreen(
         onNavigateToFiles()
     }
 
+    fun getDynamicApkUrl(version: String): String {
+        val cleanVer = if (version.startsWith("v")) version else "v$version"
+        return "https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/VideoDownloader.$cleanVer.apk"
+    }
+
     suspend fun performUpdateCheck() {
         isCheckingUpdate = true
         withContext(Dispatchers.IO) {
@@ -114,8 +119,14 @@ fun MeScreen(
                     val updateAvailable = json.optBoolean("has_update", false)
                     withContext(Dispatchers.Main) {
                         hasUpdate = updateAvailable
-                        updateVersion = json.optString("latest_version", installedVersionName)
-                        updateDownloadUrl = json.optString("download_url", "https://github.com/arvindminz/video-downloader-releases/releases/download/Downloader/VideoDownloader.v1.1.2.apk")
+                        val fetchedVer = json.optString("latest_version", installedVersionName)
+                        val fetchedUrl = json.optString("download_url", "")
+                        updateVersion = fetchedVer
+                        updateDownloadUrl = if (fetchedUrl.isNotBlank() && fetchedUrl.contains(".apk")) {
+                            fetchedUrl
+                        } else {
+                            getDynamicApkUrl(fetchedVer)
+                        }
                         updateReleaseNotes = json.optString("release_notes", "Regular maintenance update.")
                         isCheckingUpdate = false
                     }
