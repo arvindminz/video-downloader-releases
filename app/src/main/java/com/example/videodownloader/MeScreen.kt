@@ -132,6 +132,7 @@ fun MeScreen(
     }
 
     fun submitRating(stars: Int) {
+        RatingPromptHelper.markUserHasRated(context)
         coroutineScope.launch(Dispatchers.IO) {
             try {
                 val installId = TelemetryHelper.getOrCreateInstallId(context)

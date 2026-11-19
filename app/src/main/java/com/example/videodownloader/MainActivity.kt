@@ -44,9 +44,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.videodownloader.ui.theme.VideoDownloaderTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 /**
  * Main full-screen activity.
@@ -303,6 +305,53 @@ fun MainAppScreen(
     var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
     var activePlayerVideo by remember { mutableStateOf<TrendingVideo?>(null) }
     var isSearchOverlayOpen by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    var showAutoRatingDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (RatingPromptHelper.initAndCheckShouldPrompt(context)) {
+            showAutoRatingDialog = true
+        }
+    }
+
+    if (showAutoRatingDialog) {
+        RatingDialog(
+            onRatingSubmit = { stars ->
+                RatingPromptHelper.markUserHasRated(context)
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val installId = TelemetryHelper.getOrCreateInstallId(context)
+                        val deviceModel = "${android.os.Build.MANUFACTURER.uppercase()} ${android.os.Build.MODEL}"
+                        val json = JSONObject().apply {
+                            put("install_id", installId)
+                            put("stars", stars)
+                            put("device_model", deviceModel)
+                        }
+
+                        val url = java.net.URL("https://video-downloader-telemetry.arvindminz158.workers.dev/api/rating")
+                        val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                            requestMethod = "POST"
+                            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                            doOutput = true
+                            connectTimeout = 4000
+                            readTimeout = 4000
+                        }
+
+                        conn.outputStream.use { os ->
+                            os.write(json.toString().toByteArray(Charsets.UTF_8))
+                        }
+                        val code = conn.responseCode
+                        android.util.Log.d("MainActivity", "Rating response: $code")
+                    } catch (e: Exception) {
+                        android.util.Log.w("MainActivity", "Rating failed", e)
+                    }
+                }
+                showAutoRatingDialog = false
+            },
+            onDismiss = { showAutoRatingDialog = false }
+        )
+    }
 
     val downloadItems by DownloadRepository.downloadItems.collectAsState()
     val activeCount = downloadItems.count {
