@@ -1,5 +1,5 @@
 Video Downloader is a high-performance native Android media downloader powered by yt-dlp and FFmpeg.
-🌟 Key Features
+🌟 Key Features\n
 •Multi-Resolution Video & Audio: Download videos from 4K (2160p) down to 144p, or extract MP3/M4A audio in high quality.
 •Realtime Streaming Playlist Downloader: Instantly stream and batch-download entire YouTube/site playlists without waiting.
 •Built-in ExoPlayer Video Player: Watch videos directly in-app with quality toggles, CC subtitles, speed controls, background audio playback, and related video feeds.
