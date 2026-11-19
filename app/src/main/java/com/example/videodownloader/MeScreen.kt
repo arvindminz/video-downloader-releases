@@ -42,7 +42,7 @@ fun MeScreen(
     // In-App Update State
     var hasUpdate by remember { mutableStateOf(false) }
     var updateVersion by remember { mutableStateOf("v1.1.0") }
-    var updateDownloadUrl by remember { mutableStateOf("https://drive.google.com/drive/folders/19GIJWEZPmPr-IO5W2CxugXzX8rkAjLyq?usp=sharing") }
+    var updateDownloadUrl by remember { mutableStateOf("https://github.com/arvindminz/video-downloader-releases/releases/download/v1.1.0/VideoDownloader_v1.1.0.apk") }
     var updateReleaseNotes by remember { mutableStateOf("New version available!") }
 
     var isDownloadingUpdate by remember { mutableStateOf(false) }

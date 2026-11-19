@@ -17,8 +17,8 @@ Download the latest compiled APK directly to your Android device. **The latest v
 
 | Version | Release Date | Highlights & Notes | Download Link |
 | :--- | :--- | :--- | :--- |
-| 🚀 **v1.1.0** *(Latest)* | **2026-11-19** | Added 4K playlist support, realtime streaming extraction, fast-draggable scrollbars, and in-app updates. | [📥 Download APK v1.1.0](https://drive.google.com/drive/folders/19GIJWEZPmPr-IO5W2CxugXzX8rkAjLyq?usp=sharing) \| [GitHub Release](https://github.com/arvindminz/video-downloader-releases/releases/tag/v1.1.0) |
-| 📦 **v1.0.0** | **2026-11-18** | Initial Stable Release with yt-dlp & FFmpeg stream merging. | [📥 Download APK v1.0.0](https://drive.google.com/drive/folders/19GIJWEZPmPr-IO5W2CxugXzX8rkAjLyq?usp=sharing) |
+| 🚀 **v1.1.0** *(Latest)* | **2026-11-19** | Added 4K playlist support, realtime streaming extraction, fast-draggable scrollbars, and in-app updates. | [📥 Download APK v1.1.0](https://github.com/arvindminz/video-downloader-releases/releases/download/v1.1.0/VideoDownloader_v1.1.0.apk) \| [GitHub Release](https://github.com/arvindminz/video-downloader-releases/releases/tag/v1.1.0) |
+| 📦 **v1.0.0** | **2026-11-18** | Initial Stable Release with yt-dlp & FFmpeg stream merging. | [📥 Download APK v1.0.0](https://github.com/arvindminz/video-downloader-releases/releases/download/v1.1.0/VideoDownloader_v1.1.0.apk) |
 
 ---
 
