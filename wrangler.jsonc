@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "video-downloader-telemetry",
+  "main": "src/index.js",
+  "compatibility_date": "2026-02-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "telemetry_db",
+      "database_id": "40a8f8b6-10d7-4f55-9b6f-062c3de70535"
+    }
+  ]
+}
