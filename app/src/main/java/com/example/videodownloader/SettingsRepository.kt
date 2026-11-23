@@ -11,6 +11,7 @@ object SettingsRepository {
     private const val KEY_CHUNK_COUNT = "chunk_count"
     private const val KEY_DOWNLOAD_LOCATION = "download_location"
     private const val KEY_THEME_MODE = "theme_mode"
+    private const val KEY_USE_INBUILT_PLAYER = "use_inbuilt_player"
 
     fun getChunkCount(context: Context): Int {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -41,5 +42,15 @@ object SettingsRepository {
     fun setThemeMode(context: Context, mode: ThemeMode) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
+    }
+
+    fun getUseInbuiltPlayer(context: Context): Boolean {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_USE_INBUILT_PLAYER, true)
+    }
+
+    fun setUseInbuiltPlayer(context: Context, enabled: Boolean) {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_USE_INBUILT_PLAYER, enabled).apply()
     }
 }

@@ -15,7 +15,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun MyFilesScreen(
     initialSubTab: Int = 0,
-    onOpenUrlAndFetchFormats: (String) -> Unit = {}
+    onOpenUrlAndFetchFormats: (String) -> Unit = {},
+    onPlayLocalVideo: (DownloadItem) -> Unit = {}
 ) {
     val downloadItems by DownloadRepository.downloadItems.collectAsState()
     val scope = rememberCoroutineScope()
@@ -88,7 +89,10 @@ fun MyFilesScreen(
         ) { page ->
             when (page) {
                 0 -> QueueScreen(onNavigateToDownloads = { scope.launch { pagerState.animateScrollToPage(1) } })
-                1 -> DownloadsScreen(onOpenUrlAndFetchFormats = onOpenUrlAndFetchFormats)
+                1 -> DownloadsScreen(
+                    onOpenUrlAndFetchFormats = onOpenUrlAndFetchFormats,
+                    onPlayLocalVideo = onPlayLocalVideo
+                )
             }
         }
     }

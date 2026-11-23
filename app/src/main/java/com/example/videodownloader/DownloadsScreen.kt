@@ -31,6 +31,7 @@ import java.io.File
 @Composable
 fun DownloadsScreen(
     onOpenUrlAndFetchFormats: (String) -> Unit = {},
+    onPlayLocalVideo: (DownloadItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -245,7 +246,7 @@ fun DownloadsScreen(
                             isSelectionMode = true
                             selectedIds = selectedIds + item.id
                         },
-                        onOpen = { openDownloadedFile(context, item) },
+                        onOpen = { openDownloadedFile(context, item, onPlayLocalVideo) },
                         onShare = { shareDownloadedFile(context, item) },
                         onRemove = {
                             selectedIds = selectedIds - item.id
@@ -495,7 +496,19 @@ fun DownloadedItemCard(
     }
 }
 
-private fun openDownloadedFile(context: Context, item: DownloadItem) {
+private fun openDownloadedFile(
+    context: Context,
+    item: DownloadItem,
+    onPlayLocalVideo: (DownloadItem) -> Unit = {}
+) {
+    val isVideo = !item.isAudioOnly && (item.extension.equals("mp4", ignoreCase = true) || item.extension.equals("mkv", ignoreCase = true) || item.extension.equals("webm", ignoreCase = true) || item.extension.equals("3gp", ignoreCase = true))
+    val useInbuilt = SettingsRepository.getUseInbuiltPlayer(context)
+
+    if (useInbuilt && isVideo && item.status == DownloadStatus.COMPLETED) {
+        onPlayLocalVideo(item)
+        return
+    }
+
     try {
         val mimeType = when (item.extension.lowercase()) {
             "mp4", "webm", "mkv" -> "video/*"

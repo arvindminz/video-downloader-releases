@@ -1,10 +1,12 @@
 package com.example.videodownloader
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -311,6 +313,70 @@ fun SettingsPageContent() {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        // ── In-Built Video Player Switch Card ──
+        var useInbuiltPlayer by remember { mutableStateOf(SettingsRepository.getUseInbuiltPlayer(context)) }
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "Playback Player Preference",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "Choose whether to play videos using the app's built-in ExoPlayer or prompt for external players.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val newState = !useInbuiltPlayer
+                        useInbuiltPlayer = newState
+                        SettingsRepository.setUseInbuiltPlayer(context, newState)
+                    }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .padding(14.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (useInbuiltPlayer) "🎬 In-App ExoPlayer (Recommended)" else "📱 External Player (System Choice)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (useInbuiltPlayer)
+                                "Plays videos directly inside the app with full controls"
+                            else
+                                "Opens system app chooser (VLC, MX Player, Photos)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = useInbuiltPlayer,
+                        onCheckedChange = { checked ->
+                            useInbuiltPlayer = checked
+                            SettingsRepository.setUseInbuiltPlayer(context, checked)
+                        }
+                    )
                 }
             }
         }

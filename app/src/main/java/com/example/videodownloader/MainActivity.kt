@@ -304,6 +304,8 @@ fun MainAppScreen(
     var activeAboutDialog by remember { mutableStateOf<String?>(null) }
     var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
     var activePlayerVideo by remember { mutableStateOf<TrendingVideo?>(null) }
+    var activeLocalVideoPath by remember { mutableStateOf<String?>(null) }
+    var activeLocalVideoTitle by remember { mutableStateOf<String?>(null) }
     var isSearchOverlayOpen by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -379,14 +381,22 @@ fun MainAppScreen(
         return
     }
 
-    if (activePlayerVideo != null) {
+    if (activePlayerVideo != null || activeLocalVideoPath != null) {
         VideoPlayerScreen(
-            video = activePlayerVideo!!,
-            onBack = { activePlayerVideo = null },
+            video = activePlayerVideo,
+            localFilePath = activeLocalVideoPath,
+            videoTitle = activeLocalVideoTitle,
+            onBack = {
+                activePlayerVideo = null
+                activeLocalVideoPath = null
+                activeLocalVideoTitle = null
+            },
             onDownloadVideo = { targetUrl ->
                 onUrlChange(targetUrl)
                 onFetchFormats(targetUrl)
                 activePlayerVideo = null
+                activeLocalVideoPath = null
+                activeLocalVideoTitle = null
                 selectedTab = 0
             }
         )
@@ -487,6 +497,10 @@ fun MainAppScreen(
                         onUrlChange(targetUrl)
                         onFetchFormats(targetUrl)
                         selectedTab = 0
+                    },
+                    onPlayLocalVideo = { item ->
+                        activeLocalVideoPath = item.savedPath ?: item.savedUri
+                        activeLocalVideoTitle = item.title
                     }
                 )
                 2 -> MeScreen(

@@ -2,9 +2,11 @@ package com.example.videodownloader
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,30 +30,47 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerScreen(
-    video: TrendingVideo,
+    video: TrendingVideo? = null,
+    localFilePath: String? = null,
+    videoTitle: String? = null,
     onBack: () -> Unit,
-    onDownloadVideo: (String) -> Unit
+    onDownloadVideo: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var activeVideo by remember(video) { mutableStateOf(video) }
-    var streamUrl by remember(activeVideo) { mutableStateOf<String?>(null) }
-    var isExtractingStream by remember(activeVideo) { mutableStateOf(true) }
+    var streamUrl by remember { mutableStateOf<String?>(localFilePath) }
+    var isExtractingStream by remember { mutableStateOf(localFilePath.isNullOrBlank() && activeVideo != null) }
+    
+    // Player controls states
+    var isMuted by remember { mutableStateOf(false) }
+    var isLooping by remember { mutableStateOf(false) }
+    var isLocked by remember { mutableStateOf(false) }
+    var currentSpeed by remember { mutableFloatStateOf(1.0f) }
+    var currentResizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+    var showSpeedMenu by remember { mutableStateOf(false) }
     var isLiked by remember { mutableStateOf(false) }
     var isSaved by remember { mutableStateOf(false) }
+
+    val displayTitle = remember(activeVideo, videoTitle, localFilePath) {
+        localFilePath?.substringAfterLast("/") ?: videoTitle ?: activeVideo?.title ?: "Video Player"
+    }
 
     // ExoPlayer Instance
     val exoPlayer = remember(context) {
@@ -67,46 +86,63 @@ fun VideoPlayerScreen(
         }
     }
 
-    // Extract direct stream URL using yt-dlp in background
+    // If local file path provided, play immediately
+    LaunchedEffect(localFilePath) {
+        if (!localFilePath.isNullOrBlank()) {
+            isExtractingStream = false
+            val uri = if (localFilePath.startsWith("content://") || localFilePath.startsWith("http")) {
+                Uri.parse(localFilePath)
+            } else {
+                Uri.fromFile(java.io.File(localFilePath))
+            }
+            exoPlayer.setMediaItem(MediaItem.fromUri(uri))
+            exoPlayer.prepare()
+            exoPlayer.play()
+        }
+    }
+
+    // Extract direct stream URL for online TrendingVideo using yt-dlp in background
     LaunchedEffect(activeVideo) {
-        isExtractingStream = true
-        streamUrl = null
-        withContext(Dispatchers.IO) {
-            try {
-                val request = com.yausername.youtubedl_android.YoutubeDLRequest(activeVideo.videoUrl).apply {
-                    addOption("--dump-json")
-                    addOption("--format", "best[ext=mp4]/best")
-                    addOption("--no-warnings")
-                    addOption("--socket-timeout", "6")
-                    addOption("--extractor-args", "youtube:player_client=visionos,web")
-                }
-                val response = YoutubeDLUtils.execute(context, request)
-                val firstLine = response.out.lineSequence().firstOrNull { it.contains("{") }
-                if (firstLine != null) {
-                    val json = org.json.JSONObject(firstLine)
-                    val directUrl = json.optString("url", "").ifBlank {
-                        val formatsArr = json.optJSONArray("formats")
-                        if (formatsArr != null && formatsArr.length() > 0) {
-                            formatsArr.getJSONObject(formatsArr.length() - 1).optString("url", "")
-                        } else ""
+        if (localFilePath.isNullOrBlank() && activeVideo != null) {
+            isExtractingStream = true
+            streamUrl = null
+            withContext(Dispatchers.IO) {
+                try {
+                    val request = com.yausername.youtubedl_android.YoutubeDLRequest(activeVideo!!.videoUrl).apply {
+                        addOption("--dump-json")
+                        addOption("--format", "best[ext=mp4]/best")
+                        addOption("--no-warnings")
+                        addOption("--socket-timeout", "6")
+                        addOption("--extractor-args", "youtube:player_client=visionos,web")
                     }
-                    if (directUrl.isNotBlank()) {
-                        withContext(Dispatchers.Main) {
-                            streamUrl = directUrl
-                            isExtractingStream = false
-                            exoPlayer.setMediaItem(MediaItem.fromUri(directUrl))
-                            exoPlayer.prepare()
-                            exoPlayer.play()
+                    val response = YoutubeDLUtils.execute(context, request)
+                    val firstLine = response.out.lineSequence().firstOrNull { it.contains("{") }
+                    if (firstLine != null) {
+                        val json = org.json.JSONObject(firstLine)
+                        val directUrl = json.optString("url", "").ifBlank {
+                            val formatsArr = json.optJSONArray("formats")
+                            if (formatsArr != null && formatsArr.length() > 0) {
+                                formatsArr.getJSONObject(formatsArr.length() - 1).optString("url", "")
+                            } else ""
+                        }
+                        if (directUrl.isNotBlank()) {
+                            withContext(Dispatchers.Main) {
+                                streamUrl = directUrl
+                                isExtractingStream = false
+                                exoPlayer.setMediaItem(MediaItem.fromUri(directUrl))
+                                exoPlayer.prepare()
+                                exoPlayer.play()
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) { isExtractingStream = false }
                         }
                     } else {
                         withContext(Dispatchers.Main) { isExtractingStream = false }
                     }
-                } else {
+                } catch (e: Exception) {
+                    Log.w("VideoPlayerScreen", "Failed to extract playback stream URL", e)
                     withContext(Dispatchers.Main) { isExtractingStream = false }
                 }
-            } catch (e: Exception) {
-                Log.w("VideoPlayerScreen", "Failed to extract playback stream URL", e)
-                withContext(Dispatchers.Main) { isExtractingStream = false }
             }
         }
     }
@@ -128,77 +164,111 @@ fun VideoPlayerScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = onBack) {
-                    Text("∨", fontSize = 22.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Text("∨", fontSize = 22.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = displayTitle,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 160.dp)
+                    )
                 }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Auto-play Badge
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White.copy(alpha = 0.2f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("🔵▶", fontSize = 10.sp, color = Color.White)
-                        }
-                    }
-
-                    // CC Subtitles Badge
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color.White.copy(alpha = 0.25f)
-                    ) {
-                        Text(
-                            text = "CC",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                        )
-                    }
-
-                    // Resolution Badge
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color.White.copy(alpha = 0.25f)
-                    ) {
-                        Text(
-                            text = "360p",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                        )
-                    }
-
-                    // Speed Badge
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color.White.copy(alpha = 0.25f)
-                    ) {
-                        Text(
-                            text = "1x",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                        )
-                    }
-
-                    // Audio Mode Icon 🎧
+                    // Lock Toggle 🔒
                     IconButton(
                         onClick = {
-                            Toast.makeText(context, "Audio playback mode enabled", Toast.LENGTH_SHORT).show()
+                            isLocked = !isLocked
+                            Toast.makeText(context, if (isLocked) "Controls Locked 🔒" else "Controls Unlocked 🔓", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.size(32.dp)
                     ) {
-                        Text("🎧", fontSize = 16.sp)
+                        Text(if (isLocked) "🔒" else "🔓", fontSize = 15.sp)
+                    }
+
+                    // Loop Toggle 🔁
+                    IconButton(
+                        onClick = {
+                            isLooping = !isLooping
+                            exoPlayer.repeatMode = if (isLooping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+                            Toast.makeText(context, if (isLooping) "Loop Enabled 🔁" else "Loop Off", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Text(if (isLooping) "🔁" else "🔂", fontSize = 15.sp)
+                    }
+
+                    // Aspect Ratio Resize Mode Toggle (Fit, Zoom, Stretch)
+                    IconButton(
+                        onClick = {
+                            currentResizeMode = when (currentResizeMode) {
+                                AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            }
+                            val modeLabel = when (currentResizeMode) {
+                                AspectRatioFrameLayout.RESIZE_MODE_FIT -> "Fit to Screen"
+                                AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Crop / Fill"
+                                else -> "Stretch Screen"
+                            }
+                            Toast.makeText(context, modeLabel, Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Text("📺", fontSize = 15.sp)
+                    }
+
+                    // Speed Selector Menu Dropdown
+                    Box {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color.White.copy(alpha = 0.25f),
+                            modifier = Modifier.clickable { showSpeedMenu = true }
+                        ) {
+                            Text(
+                                text = "${currentSpeed}x",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showSpeedMenu,
+                            onDismissRequest = { showSpeedMenu = false }
+                        ) {
+                            listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
+                                DropdownMenuItem(
+                                    text = { Text("${speed}x", fontWeight = if (speed == currentSpeed) FontWeight.Bold else FontWeight.Normal) },
+                                    onClick = {
+                                        currentSpeed = speed
+                                        exoPlayer.playbackParameters = PlaybackParameters(speed)
+                                        showSpeedMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Mute / Unmute Volume Toggle 🔇🔊
+                    IconButton(
+                        onClick = {
+                            isMuted = !isMuted
+                            exoPlayer.volume = if (isMuted) 0f else 1f
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Text(if (isMuted) "🔇" else "🔊", fontSize = 15.sp)
                     }
                 }
             }
@@ -223,42 +293,67 @@ fun VideoPlayerScreen(
                     factory = { ctx ->
                         PlayerView(ctx).apply {
                             player = exoPlayer
-                            useController = true
-                            setShowNextButton(true)
+                            useController = !isLocked
+                            resizeMode = currentResizeMode
+                            setShowNextButton(false)
                             setShowPreviousButton(false)
                         }
+                    },
+                    update = { view ->
+                        view.player = exoPlayer
+                        view.useController = !isLocked
+                        view.resizeMode = currentResizeMode
                     },
                     modifier = Modifier.fillMaxSize()
                 )
             }
         }
 
-        // ── Video Info & Creator Section ──
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+        // ── Quick Seek Actions Row (-10s Rewind, Play/Pause, +10s Forward) ──
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    AsyncImage(
-                        model = activeVideo.channelAvatarUrl,
-                        contentDescription = activeVideo.channelName,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    exoPlayer.seekTo((exoPlayer.currentPosition - 10000).coerceAtLeast(0))
+                }) {
+                    Text("⏪ -10s", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                IconButton(onClick = {
+                    if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                }) {
+                    Text(if (exoPlayer.isPlaying) "⏸ Pause" else "▶ Play", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
 
-                    Column(modifier = Modifier.weight(1f)) {
+                IconButton(onClick = {
+                    exoPlayer.seekTo((exoPlayer.currentPosition + 10000).coerceAtMost(exoPlayer.duration))
+                }) {
+                    Text("+10s ⏩", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // ── Related Videos & Info Section (If Online Video) ──
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (activeVideo != null) {
+                item {
+                    Column {
                         Text(
-                            text = activeVideo.title,
+                            text = activeVideo!!.title,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
@@ -267,207 +362,61 @@ fun VideoPlayerScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${activeVideo.channelName} • ${activeVideo.viewsText} • ${activeVideo.uploadedAgo}",
+                            text = "${activeVideo!!.channelName} • ${activeVideo!!.viewsText} • ${activeVideo!!.uploadedAgo}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
                     }
-
-                    // Like / Dislike Pills
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.clickable { isLiked = !isLiked }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(if (isLiked) "👍" else "👍", fontSize = 13.sp)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("1119", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("|", fontSize = 12.sp, color = Color.Gray)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("👎", fontSize = 13.sp)
-                        }
-                    }
                 }
-            }
 
-            // ── Action Buttons Row (Save, Popup, Play Audio, Share, Download) ──
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    PlayerActionButton(
-                        iconText = "➕",
-                        label = if (isSaved) "Saved" else "Save",
-                        iconColor = if (isSaved) Color.Red else MaterialTheme.colorScheme.onSurface,
-                        onClick = {
-                            isSaved = !isSaved
-                            Toast.makeText(context, if (isSaved) "Saved to collection" else "Removed", Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                    PlayerActionButton(
-                        iconText = "📺",
-                        label = "Popup",
-                        onClick = {
-                            Toast.makeText(context, "Picture-in-Picture mode", Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                    PlayerActionButton(
-                        iconText = "🎧",
-                        label = "Play Audio",
-                        onClick = {
-                            Toast.makeText(context, "Playing audio in background", Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                    PlayerActionButton(
-                        iconRes = R.drawable.share,
-                        label = "Share",
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, activeVideo.videoUrl)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Share Video"))
-                        }
-                    )
-                    PlayerActionButton(
-                        iconText = "📥",
-                        label = "Download",
-                        iconColor = Color(0xFFFF2A4B),
-                        onClick = {
-                            onDownloadVideo(activeVideo.videoUrl)
-                        }
-                    )
-                }
-            }
-
-            // ── Comments Card Section ──
-            item {
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Comments", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("· 13", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text("⌥", fontSize = 14.sp, color = Color.Gray)
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xFFE91E63),
-                                modifier = Modifier.size(26.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text("M", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Singer ka naam kya hai yaar",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ── Suggested / Related Videos Header ──
-            item {
-                Text(
-                    text = "Related Videos",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-
-            // ── Suggested Videos List ──
-            items(TrendingFeedRepository.defaultTrendingList) { related ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { activeVideo = related },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
+                // Action Buttons Row (Save, Share, Download)
+                item {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .width(120.dp)
-                                .height(68.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        ) {
-                            AsyncImage(
-                                model = related.thumbnailUrl,
-                                contentDescription = related.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = Color.Black.copy(alpha = 0.85f),
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(4.dp)
-                            ) {
-                                Text(
-                                    text = related.durationText,
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                )
+                        PlayerActionButton(
+                            iconText = "➕",
+                            label = if (isSaved) "Saved" else "Save",
+                            iconColor = if (isSaved) Color.Red else MaterialTheme.colorScheme.onSurface,
+                            onClick = {
+                                isSaved = !isSaved
+                                Toast.makeText(context, if (isSaved) "Saved to collection" else "Removed", Toast.LENGTH_SHORT).show()
                             }
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = related.title,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        )
+                        PlayerActionButton(
+                            iconRes = R.drawable.share,
+                            label = "Share",
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, activeVideo!!.videoUrl)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Share Video"))
+                            }
+                        )
+                        PlayerActionButton(
+                            iconText = "📥",
+                            label = "Download",
+                            iconColor = Color(0xFFFF2A4B),
+                            onClick = {
+                                onDownloadVideo(activeVideo!!.videoUrl)
+                            }
+                        )
+                    }
+                }
+            } else {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("🎬 Local Media File Playing", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "${related.channelName} • ${related.viewsText}",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        IconButton(onClick = { onDownloadVideo(related.videoUrl) }) {
-                            Text("📥", fontSize = 18.sp)
+                            Text(displayTitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
