@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    install_id TEXT,
+    stars INTEGER NOT NULL,
+    device_model TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS feedbacks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    install_id TEXT,
+    review TEXT NOT NULL,
+    device_model TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
